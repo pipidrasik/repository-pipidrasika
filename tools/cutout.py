@@ -2,7 +2,9 @@ import sys
 from collections import deque
 from PIL import Image
 
-def cutout(src, dst, size=512, thr=110):
+def cutout(src, dst, size=512, thr=110, seeds=()):
+    """Remove the white background reachable from the image border (plus any extra seed points,
+    for white gaps fully enclosed by the outline) and convert it to alpha."""
     im = Image.open(src).convert("RGB").resize((size, size), Image.LANCZOS)
     w, h = im.size
     px = im.load()
@@ -12,6 +14,7 @@ def cutout(src, dst, size=512, thr=110):
         q.append((x, 0)); q.append((x, h - 1))
     for y in range(h):
         q.append((0, y)); q.append((w - 1, y))
+    q.extend(seeds)
     out = Image.new("RGBA", (w, h))
     op = out.load()
     for y in range(h):
@@ -39,6 +42,16 @@ def cutout(src, dst, size=512, thr=110):
                 q.append((nx, ny))
     out.save(dst)
 
-for src, dst in zip(sys.argv[1::2], sys.argv[2::2]):
-    cutout(src, dst)
-    print("saved", dst)
+if __name__ == "__main__":
+    # usage: cutout.py SRC DST [SRC DST ...] [--seed X,Y ...]  (seed coords are in the 512px output)
+    args, seeds = [], []
+    it = iter(sys.argv[1:])
+    for a in it:
+        if a == "--seed":
+            x, y = next(it).split(",")
+            seeds.append((int(x), int(y)))
+        else:
+            args.append(a)
+    for src, dst in zip(args[::2], args[1::2]):
+        cutout(src, dst, seeds=seeds)
+        print("saved", dst)
